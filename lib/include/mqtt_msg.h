@@ -97,6 +97,7 @@ typedef struct mqtt_connect_info
     int will_qos;
     int will_retain;
     int clean_session;
+    int refresh;
 
 } mqtt_connect_info_t;
 

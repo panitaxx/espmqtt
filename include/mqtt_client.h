@@ -50,6 +50,7 @@ typedef struct {
 typedef esp_mqtt_event_t* esp_mqtt_event_handle_t;
 
 typedef esp_err_t (* mqtt_event_callback_t)(esp_mqtt_event_handle_t event);
+typedef int (* refresh_jwt_callback_t)(char**);
 
 
 typedef struct {
@@ -62,11 +63,13 @@ typedef struct {
     const char *password;
     const char *lwt_topic;
     const char *lwt_msg;
+    refresh_jwt_callback_t refresh_jwt;
     int lwt_qos;
     int lwt_retain;
     int lwt_msg_len;
     int disable_clean_session;
     int keepalive;
+    int refresh;
     bool disable_auto_reconnect;
     void *user_context;
     int task_prio;

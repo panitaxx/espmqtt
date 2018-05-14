@@ -62,7 +62,9 @@ struct esp_mqtt_client {
     mqtt_connect_info_t connect_info;
     mqtt_client_state_t state;
     long long keepalive_tick;
+    long long refresh_tick;
     long long reconnect_tick;
+    refresh_jwt_callback_t jwt_get; 
     int wait_timeout_ms;
     int auto_reconnect;
     esp_mqtt_event_t event;
@@ -105,6 +107,9 @@ static esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_
         ESP_MEM_CHECK(TAG, cfg->host, goto _mqtt_set_config_failed);
     }
     cfg->port = config->port;
+    if(config->refresh_jwt){
+        client->jwt_get = config->refresh_jwt;
+    }
 
     if (config->username) {
         client->connect_info.username = strdup(config->username);
@@ -156,6 +161,8 @@ static esp_err_t esp_mqtt_set_config(esp_mqtt_client_handle_t client, const esp_
     if (client->connect_info.keepalive == 0) {
         client->connect_info.keepalive = MQTT_KEEPALIVE_TICK;
     }
+    client->connect_info.refresh = config -> refresh; 
+    
     cfg->network_timeout_ms = MQTT_NETWORK_TIMEOUT_MS;
     cfg->user_context = config->user_context;
     cfg->event_handle = config->event_handle;
@@ -193,6 +200,13 @@ static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_m
     mqtt_msg_init(&client->mqtt_state.mqtt_connection,
                   client->mqtt_state.out_buffer,
                   client->mqtt_state.out_buffer_length);
+    if(client->jwt_get != NULL) {
+            char *old_p = client->connect_info.password;
+            char *ret; 
+            client->jwt_get(&ret);
+            client->connect_info.password = ret;
+            free(old_p);
+    }
     client->mqtt_state.outbound_message = mqtt_msg_connect(&client->mqtt_state.mqtt_connection,
                                           client->mqtt_state.connect_info);
     client->mqtt_state.pending_msg_type = mqtt_get_type(client->mqtt_state.outbound_message->data);
@@ -687,6 +701,7 @@ static void esp_mqtt_task(void *pv)
                 }
                 client->event.event_id = MQTT_EVENT_CONNECTED;
                 client->state = MQTT_STATE_CONNECTED;
+                client->keepalive_tick = client->refresh_tick = platform_tick_get_ms();
                 esp_mqtt_dispatch_event(client);
 
                 break;
@@ -702,6 +717,10 @@ static void esp_mqtt_task(void *pv)
                         esp_mqtt_abort_connection(client);
                         break;
                     }
+                }
+                if(platform_tick_get_ms()- client->refresh_tick > client->connect_info.refresh * 1000) {
+                    esp_mqtt_abort_connection(client);
+                    break;
                 }
 
                 //Delete mesaage after 30 senconds

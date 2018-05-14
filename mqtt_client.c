@@ -204,7 +204,7 @@ static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_m
             char *old_p = client->connect_info.password;
             char *ret; 
             client->jwt_get(&ret);
-            client->connect_info.password = ret;
+            client->connect_info.password = strdup(ret);
             free(old_p);
     }
     client->mqtt_state.outbound_message = mqtt_msg_connect(&client->mqtt_state.mqtt_connection,
@@ -214,8 +214,8 @@ static esp_err_t esp_mqtt_connect(esp_mqtt_client_handle_t client, int timeout_m
                                         client->mqtt_state.outbound_message->length);
     ESP_LOGI(TAG, "Sending MQTT CONNECT message, type: %d, id: %04X",
              client->mqtt_state.pending_msg_type,
-             client->mqtt_state.pending_msg_id);
-
+             client->mqtt_state.pending_msg_id);    
+    
     write_len = transport_write(client->transport,
                                 (char *)client->mqtt_state.outbound_message->data,
                                 client->mqtt_state.outbound_message->length,
